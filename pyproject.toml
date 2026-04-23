@@ -1,0 +1,19 @@
+[project]
+name = "customer-churn"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.136.0",
+    "great-expectations>=1.17.0",
+    "joblib>=1.5.3",
+    "mlflow>=3.11.1",
+    "numpy>=2.4.4",
+    "pandas>=2.3.3",
+    "pydantic>=2.13.3",
+    "pytest>=9.0.3",
+    "python-dotenv>=1.2.2",
+    "scikit-learn>=1.8.0",
+    "uvicorn>=0.46.0",
+]
