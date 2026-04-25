@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/kaifa/Soul/CSProjects/Active%20Projects/customer-churn/mlruns/263817735337772034/57af65edfbd1468c9f012f10332f5029/artifacts
+end_time: 1777146275966
+entry_point_name: ''
+experiment_id: '263817735337772034'
+lifecycle_stage: active
+run_id: 57af65edfbd1468c9f012f10332f5029
+run_name: judicious-stag-243
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777146236137
+status: 3
+tags: []
+user_id: kaifa

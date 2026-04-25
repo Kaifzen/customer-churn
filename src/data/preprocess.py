@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 def preprocess_data(df: pd.DataFrame, target_col: str = "Churn") -> pd.DataFrame:
     """
     Basic cleaning for Telco churn.
