@@ -35,3 +35,5 @@ data/processed/
 !src/serving/model/
 !src/serving/model/**
 
+# uv
+uv.lock
