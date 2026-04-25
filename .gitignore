@@ -1,24 +1,14 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-
-# pyenv
-.python-version
-
-# Environments
-.env
-.venv
-env/
+# venvs
+.venv/
 venv/
-ENV/
+env/
 
-# IDE and editor files
+# uv
+.python-version
+uv.lock
+
+# OS cruft
 .DS_Store
-
-# Project specific
-# Data files (if large)
-*.csv
-data/
-models/
 
 # Python cache
 __pycache__/
@@ -34,6 +24,3 @@ data/processed/
 # BUT keep our bundled serving model in the repo
 !src/serving/model/
 !src/serving/model/**
-
-# uv
-uv.lock
