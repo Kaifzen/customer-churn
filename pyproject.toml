@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.136.0",
+    "gradio>=6.13.0",
     "great-expectations>=1.17.0",
     "joblib>=1.5.3",
     "lightgbm>=4.6.0",
