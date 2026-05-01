@@ -11,10 +11,10 @@ RUN apt-get update \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Copy dependency manifests first to maximize layer cache reuse.
-COPY pyproject.toml uv.lock* README.md ./
+COPY pyproject.toml README.md ./
 
 # Install project dependencies into the uv-managed environment.
-RUN uv sync --locked --no-dev
+RUN uv sync --no-dev
 
 # Copy source code and serving model artifacts.
 COPY src /app/src
@@ -27,3 +27,6 @@ EXPOSE 8000
 
 # Run the consolidated FastAPI app entrypoint.
 CMD ["uv", "run", "uvicorn", "src.app.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# # Spaces sets PORT dynamically; default to 7860 for local container runs.
+# CMD ["sh", "-c", "uv run uvicorn src.app.app:app --host 0.0.0.0 --port ${PORT:-7860}"]
