@@ -59,7 +59,7 @@ def main():
 	args = parser.parse_args()
 
 	base_url = args.base_url.rstrip("/")
-	health_url = f"{base_url}/"
+	health_url = f"{base_url}/health"
 	predict_url = f"{base_url}/predict"
 
 	try:
