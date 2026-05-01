@@ -21,13 +21,26 @@ An end-to-end MLOps project that predicts customer churn for a telecom company �
 9. [Serving & API](#9-serving--api)
 10. [Deployment](#10-deployment)
 11. [CI/CD](#11-cicd)
-12. [Quickstart](#12-quickstart)
+12. [Development Challenges & Solutions](#12-development-challenges--solutions)
+13. [Quickstart](#13-quickstart)
 
 ---
 
 ## 1. Overview
 
+### Business Problem
+
+Customer churn is one of the most critical challenges in the telecom industry. Acquiring a new customer costs **5–25× more** than retaining an existing one, and even a 5% improvement in retention can increase profits by 25–95%. This project tackles the churn prediction problem by building a machine learning system that identifies at-risk customers **before they leave**, enabling proactive retention campaigns.
+
+**Why recall matters more than precision here:**  
+Missing a churner (false negative) means losing that customer and their lifetime value. A false positive (wrongly flagging a loyal customer) only costs a retention offer — often a discount or support call. The business trade-off heavily favours catching more churners, even at the cost of some false alarms.
+
+### Technical Solution
+
 Trained on the [IBM Telco Customer Churn dataset](https://www.kaggle.com/datasets/blastchar/telco-customer-churn), the model uses **LightGBM** tuned with **Optuna** using a **recall-first objective** (weighted 75% recall / 25% F1) with a soft precision floor of ≥ 0.40 — prioritising catching churners over minimising false positives. The final model applies a lowered probability threshold (≈ 0.264) to further maximise recall at inference time.
+
+**Real-world impact:**  
+With **90.1% recall**, the model catches 9 out of 10 churners, allowing the business to intervene early with targeted retention strategies while maintaining acceptable precision (42.5%) to avoid retention budget waste.
 
 ---
 
@@ -36,6 +49,36 @@ Trained on the [IBM Telco Customer Churn dataset](https://www.kaggle.com/dataset
 **IBM Telco Customer Churn** — 7,043 customers, 20 features covering demographics, account info, and subscribed services.
 
 Source: [Kaggle — Telco Customer Churn](https://www.kaggle.com/datasets/blastchar/telco-customer-churn)
+
+### Data Structure
+
+**Features (20):**  
+`customerID`, `gender`, `SeniorCitizen`, `Partner`, `Dependents`, `tenure`, `PhoneService`, `MultipleLines`, `InternetService`, `OnlineSecurity`, `OnlineBackup`, `DeviceProtection`, `TechSupport`, `StreamingTV`, `StreamingMovies`, `Contract`, `PaperlessBilling`, `PaymentMethod`, `MonthlyCharges`, `TotalCharges`, `Churn`
+
+**Sample row:**
+```
+customerID: 7590-VHVEG
+gender: Female
+SeniorCitizen: 0
+Partner: Yes
+Dependents: No
+tenure: 1 (months)
+PhoneService: No
+MultipleLines: No phone service
+InternetService: DSL
+OnlineSecurity: No
+OnlineBackup: Yes
+DeviceProtection: No
+TechSupport: No
+StreamingTV: No
+StreamingMovies: No
+Contract: Month-to-month
+PaperlessBilling: Yes
+PaymentMethod: Electronic check
+MonthlyCharges: 29.85
+TotalCharges: 29.85
+Churn: No
+```
 
 ---
 
@@ -117,13 +160,16 @@ The full training pipeline is run via `scripts/run_pipeline.py` and includes:
 
 **Model performance metrics tracked:**
 
-| Metric | Description |
-|---|---|
-| **Recall (churn)** | Primary objective — minimise missed churners |
-| **Precision (churn)** | Soft floor of ≥ 0.40 enforced during tuning |
-| **F1 (churn)** | Secondary objective component (25% weight) |
-| **ROC-AUC** | Threshold-independent comparison |
-| **Accuracy** | Logged for reference |
+| Metric | Value | Description |
+|---|---|---|
+| **Recall (churn)** | **90.1%** | Primary objective — catches 9 out of 10 churners |
+| **Precision (churn)** | **42.5%** | Soft floor of ≥ 0.40 met — acceptable false positive rate |
+| **F1 (churn)** | **57.8%** | Harmonic mean of precision and recall |
+| **ROC-AUC** | **83.8%** | Strong threshold-independent discrimination |
+| **Accuracy** | **65.0%** | Overall correctness (less relevant for imbalanced classes) |
+
+> **Performance interpretation:**  
+> The model prioritises recall over precision, intentionally trading some false positives for significantly fewer false negatives. This aligns with the business reality where missing a churner (false negative) is far more costly than offering retention to a loyal customer (false positive).
 
 ---
 
@@ -230,7 +276,95 @@ Required repository secrets: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`.
 
 ---
 
-## 12. Quickstart
+## 12. Development Challenges & Solutions
+
+Key technical challenges solved during development:
+
+### 1. Custom Recall-First Optuna Objective
+
+**Challenge:** Standard classification metrics (accuracy, F1) don't align with the business goal of maximising churner detection while maintaining acceptable precision.
+
+**Solution:** Built a custom Optuna objective function that:
+- Weights recall 75% and F1 25% to prioritise catching churners
+- Enforces a soft precision floor (≥ 0.40) via penalty term
+- Runs 5-fold stratified cross-validation with early stopping per fold
+- Penalises models that drop below minimum precision threshold
+
+**Impact:** Achieved 90.1% recall vs ~75% with standard F1 optimisation.
+
+### 2. Post-Training Threshold Tuning
+
+**Challenge:** Default probability threshold (0.5) optimises for balanced classes, but churn datasets are imbalanced (~27% churn rate).
+
+**Solution:** After Optuna hyperparameter tuning, performed a secondary grid search over thresholds (0.1–0.9) on the validation set to find the optimal decision boundary for recall maximisation.
+
+**Impact:** Lowering threshold from 0.5 → 0.264 increased recall from 82% → 90.1% while keeping precision at 42.5%.
+
+### 3. MLflow 3.x Artifact Path Migration
+
+**Challenge:** MLflow 3.x changed artifact directory structure from flat `artifacts/` to nested `artifacts/model/`, breaking serving-time model loading.
+
+**Solution:** Implemented multi-path fallback logic in `inference.py`:
+1. Try MLflow 3.x nested path: `artifacts/model/model.pkl`
+2. Fall back to flat path: `artifacts/model.pkl`
+3. Check LFS-tracked model at `src/serving/model/<run_id>/artifacts/model/model.pkl`
+4. Load feature schema from `feature_columns.txt` in same directory
+
+**Impact:** Zero-downtime model loading across MLflow versions and deployment environments.
+
+### 4. FastAPI + Gradio Architecture
+
+**Challenge:** Gradio's standalone `demo.launch()` conflicts with FastAPI's routing when both need to serve on the same port.
+
+**Solution:** Used `gr.mount_gradio_app()` to mount Gradio as a sub-application at `/ui/` while FastAPI handles:
+- `/predict` — REST API for programmatic access
+- `/health` — Docker health checks
+- `/docs` — OpenAPI schema
+- `/` — Redirect to Gradio UI
+
+**Impact:** Single-port deployment with both interactive UI and REST API, simplifying Docker networking and HF Spaces config.
+
+### 5. Git LFS Binary Artifact Strategy
+
+**Challenge:** Hugging Face Spaces rejected direct push of 1.2 MB `model.pkl` binary blob; GitHub also warns on files > 50 MB.
+
+**Solution:** 
+1. Installed `git-xet` extension for Hugging Face compatibility
+2. Configured Git LFS tracking: `git lfs track "*.pkl"`
+3. Migrated existing binary: `git lfs migrate import --include="*.pkl"`
+4. Verified LFS pointer format in repository (3-line pointer file instead of raw binary)
+
+**Impact:** Model artifacts tracked as lightweight pointers in Git, actual binaries stored in LFS backend, enabling seamless HF Spaces deployment.
+
+### 6. Dynamic PORT Binding for Multi-Environment Deployment
+
+**Challenge:** Local development uses port 8000, Docker defaults to 7860, but Hugging Face Spaces injects a random `$PORT` at runtime.
+
+**Solution:** Modified Dockerfile CMD to use shell parameter expansion:
+```dockerfile
+CMD sh -c "uv run uvicorn src.app.app:app --host 0.0.0.0 --port ${PORT:-7860}"
+```
+This reads `$PORT` if set (HF Spaces), otherwise defaults to 7860 (local Docker).
+
+**Impact:** Single Dockerfile works across local, Docker Hub, and HF Spaces without environment-specific changes.
+
+### 7. CI/CD Without Lockfile Commitment
+
+**Challenge:** `uv.lock` not committed to repo (personal choice for lightweight dependency management), but GitHub Actions `setup-uv` with `enable-cache: true` hard-fails when lockfile missing.
+
+**Solution:** Modified CI workflow to disable UV cache:
+```yaml
+- uses: astral-sh/setup-uv@v5
+  with:
+    enable-cache: false
+```
+All dependency resolution happens fresh per CI run via `uv sync --no-dev`.
+
+**Impact:** CI passes without lockfile; trade-off is slightly slower install (~30s) vs deterministic builds.
+
+---
+
+## 13. Quickstart
 
 **Install dependencies**
 ```bash
